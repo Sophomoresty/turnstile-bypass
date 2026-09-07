@@ -141,6 +141,13 @@ scripts/runtime.py
 - Do not cache tokens across sessions.
 - Not a general Cloudflare WAF bypass.
 
+本项目的开发 agent 能力由 [GenericAgent](https://github.com/lsdefine/GenericAgent) 提供。
+
+### 🚩 友情链接
+
+[![GenericAgent](https://img.shields.io/badge/Agent_Framework-GenericAgent-orange?style=for-the-badge&logo=github)](https://github.com/lsdefine/GenericAgent)
+[![LinuxDo](https://img.shields.io/badge/社区-LinuxDo-blue?style=for-the-badge)](https://linux.do/)
+
 ## License
 
 MIT. See `LICENSE`.
