@@ -97,20 +97,17 @@ DrissionPage does this for you via `add_extension`. You do not need to click tha
 
 ## Verified
 
-**2026-09-07**, macOS, Chrome 152, agent-browser + this extension, Chrome CDP 19221, `patched: true`. No `chrome-show`.
+Live `python3 scripts/e2e.py` on **2026-09-08** (macOS, Chrome 152, agent-browser, CDP **19221**). Both cases `ok: true`.
 
-| Target | Sitekey | Result | Time |
+| Target | Lane | Token length | Time |
 |---|---|---|---|
-| https://demo.turnstile.workers.dev/ | Cloudflare always-pass `1x00000000000000000000AA` | `ok`, iframe click, token length 21 | 9.47s |
-| `examples/interactive-dummy.html` | Interactive dummy `3x00000000000000000000FF` | widget found, iframe click, `patched: true`, token length 21 | 9.45s |
+| https://demo.turnstile.workers.dev/ | ab | 21 | 3.46s |
+| `examples/interactive-dummy.html` | ab | 21 | 7.46s |
 
-Cloudflare **dummy sitekeys always mint** `XXXX.DUMMY.TOKEN.XXXX`. That is enough to prove navigate → find widget → click CF iframe with the patch → read a token that passes the length gate. A production sitekey returns a much longer token (often 700–800+). Dummy keys will not.
-
-Reproduce:
+Cloudflare dummy sitekeys mint `XXXX.DUMMY.TOKEN.XXXX`. That still proves: open page → find widget → click CF iframe → token longer than 20. Production sitekeys return much longer tokens.
 
 ```bash
-python3 -m http.server 8766 --directory examples
-python3 scripts/solve.py --url "http://127.0.0.1:8766/interactive-dummy.html"
+python3 scripts/e2e.py
 ```
 
 ## Layout
@@ -123,7 +120,8 @@ requirements.txt          # DrissionPage
 assets/turnstilePatch/    # unpacked MV3 extension
 assets/turnstilePatch.zip # same, zipped
 examples/interactive-dummy.html
-scripts/install.py        # venv + deps + pack + preflight
+scripts/install.py            # venv + deps + pack + preflight
+scripts/e2e.py                # live two-page check; exit 0 only on success
 scripts/preflight.py
 scripts/solve.py          # entry
 scripts/solve_turnstile.py

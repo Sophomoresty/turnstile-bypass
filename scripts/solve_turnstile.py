@@ -162,11 +162,27 @@ def main() -> int:
     try:
         browser = Chromium(co)
         page = browser.get_tabs()[-1]
-        page.get(args.url, timeout=args.timeout)
-        token = solve_turnstile(page, timeout_s=float(args.timeout))
-        if not token:
-            return emit(False, error="no token after timeout", elapsed_s=round(time.time() - t0, 2))
-        return emit(True, token=token, elapsed_s=round(time.time() - t0, 2), tokenLen=len(token))
+        page.get(args.url, timeout=max(15.0, float(args.timeout)))
+        token = read_token(page)
+        extra: dict = {"lane": "drission", "cdpPort": port}
+        if len(token) <= 20:
+            import solve_agent_browser as sab
+
+            tabs = sab.json_list(port)
+            page_id = None
+            for tab in tabs:
+                if tab.get("type") == "page" and tab.get("webSocketDebuggerUrl"):
+                    page_id = tab.get("id")
+            if page_id:
+                result = sab.solve(port, str(page_id), float(args.timeout))
+                token = str(result.get("token") or "")
+                extra["attempts"] = result.get("attempts")
+                extra["steps"] = result.get("steps")
+            else:
+                token = solve_turnstile(page, timeout_s=float(args.timeout)) or ""
+        if len(token) <= 20:
+            return emit(False, error="no token after timeout", elapsed_s=round(time.time() - t0, 2), **extra)
+        return emit(True, token=token, elapsed_s=round(time.time() - t0, 2), tokenLen=len(token), **extra)
     except Exception as exc:
         import traceback
 

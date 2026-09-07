@@ -283,11 +283,8 @@ def wait_widget(port: int, target_id: str, timeout_s: float) -> dict[str, Any] |
         except Exception:
             last = None
         if isinstance(last, dict) and last.get("found") and float(last.get("w") or 0) >= 50:
-            tok = last.get("ts") or {}
-            if last.get("len", 0) > 20 or len(str(tok.get("resp") or "")) > 20:
-                return last
             return last
-            time.sleep(0.25)
+        time.sleep(0.25)
     return last if isinstance(last, dict) else None
 
 

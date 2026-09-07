@@ -10,7 +10,7 @@ Read `README.md` first. Do not invent extra tools.
 5. Solve:
    `python3 scripts/solve.py --url "<PAGE_WITH_TURNSTILE>"`
 6. Success: stdout JSON `"ok": true` and `token` length > 20. Hand the token to the next request immediately (TTL ~300s).
-7. Failure: print `error`. One residential-proxy retry if the IP looks like a datacenter. Do not loop. Do not fake a token.
+7. `python3 scripts/e2e.py` must print `"ok": true` for both cases before you trust a change.
 
 Default: DrissionPage after `scripts/install.py`. If `agent-browser-cli` is on PATH, `solve.py` prefers it (`TURNSTILE_PREFER_AB=0` forces Drission).
 
