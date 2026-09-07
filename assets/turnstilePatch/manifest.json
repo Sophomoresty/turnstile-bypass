@@ -1,12 +1,19 @@
 {
-    "manifest_version": 3,
-    "name": "Turnstile Patcher",
-    "version": "2.1",
-    "content_scripts": [{
-        "js": ["./script.js"],
-        "matches": ["<all_urls>"],
-        "run_at": "document_start",
-        "all_frames": true,
-        "world": "MAIN"
-    }]
+  "manifest_version": 3,
+  "name": "Turnstile Patcher",
+  "version": "2.2.0",
+  "description": "Restores MouseEvent screenX/screenY inside Cloudflare Turnstile iframes so CDP clicks are not fingerprinted.",
+  "content_scripts": [
+    {
+      "js": ["script.js"],
+      "matches": [
+        "https://challenges.cloudflare.com/*",
+        "http://challenges.cloudflare.com/*"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true,
+      "world": "MAIN"
+    }
+  ]
 }

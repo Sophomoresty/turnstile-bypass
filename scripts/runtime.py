@@ -9,6 +9,7 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 PATCH_DIR = SKILL_DIR / "assets" / "turnstilePatch"
+PATCH_ZIP = SKILL_DIR / "assets" / "turnstilePatch.zip"
 
 # AB managed Chrome CDP vs shim. Override if your bridge uses other ports.
 DEFAULT_AB_SHIM_PORT = int(os.environ.get("TURNSTILE_AB_SHIM_PORT") or "19222")
@@ -150,13 +151,47 @@ def chrome_port_for(ab_port: int) -> int:
 def has_display() -> bool:
     if is_darwin() or is_windows():
         return True
-    if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
-        return True
-    return bool(which("Xvfb") or which("xvfb-run"))
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+
+def has_drissionpage(py: Path | None = None) -> bool:
+    import subprocess
+
+    exe = str(py) if py and py.is_file() else sys.executable
+    r = subprocess.run(
+        [exe, "-c", "import DrissionPage"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return r.returncode == 0
+
+
+def solver_python() -> str:
+    """Python that can import DrissionPage: current interp, then repo/user venv."""
+    if has_drissionpage(Path(sys.executable)):
+        return sys.executable
+    venv = venv_python()
+    if venv and has_drissionpage(venv):
+        return str(venv)
+    return sys.executable
 
 
 def patch_ok() -> bool:
     return (PATCH_DIR / "manifest.json").is_file() and (PATCH_DIR / "script.js").is_file()
+
+
+def ensure_patch() -> bool:
+    if patch_ok():
+        return True
+    if not PATCH_ZIP.is_file():
+        return False
+    import zipfile
+
+    PATCH_DIR.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(PATCH_ZIP) as zf:
+        zf.extractall(PATCH_DIR)
+    return patch_ok()
 
 
 def manifest_world_main() -> bool:

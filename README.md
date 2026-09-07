@@ -1,141 +1,147 @@
 # turnstile-bypass
 
-A small, local solver for **Cloudflare Turnstile** on macOS, Windows, and Linux.
+Self-contained **Cloudflare Turnstile** solver for macOS, Windows, and Linux.
 
-It opens the page (or uses an already-running Chrome), clicks the Turnstile widget the way a real mouse would, and prints a JSON token. That is the CF “checkbox / managed widget” shield — not the 5-second waiting room, not a JS interstitial, and not a generic WAF bypass.
+It loads a small Chrome extension, opens the page in headed Chrome, clicks the Turnstile widget, and prints a JSON token. That is the CF checkbox / managed **widget**. It does not pass the 5-second “Checking your browser” waiting room, JS interstitials, Bot Fight, or other CAPTCHAs.
 
-```bash
-python3 scripts/preflight.py
-python3 scripts/solve.py --url "https://example.com/login"
-```
-
-`ok` is `true` only when the token is longer than 20 characters. Use it immediately (lifetime is about five minutes).
-
-## What it is not
-
-| In scope | Out of scope |
-|---|---|
-| Turnstile widget (visible, managed, interactive) | IUAM / “Checking your browser” interstitial |
-| Token in `cf-turnstile-response` / `turnstile.getResponse()` | Bot Fight Mode, JS challenges, IP bans |
-| Headed Chrome / Chromium (or Xvfb) | Headless Chrome (fingerprint + Shadow DOM fail) |
-| | hCaptcha, reCAPTCHA |
-
-## Why a CDP click is not enough
-
-Chrome DevTools `Input.dispatchMouseEvent` sets `screenX` / `screenY` equal to the client coordinates ([chromium 40280325](https://issues.chromium.org/issues/40280325)). Turnstile treats that as automation.
-
-`assets/turnstilePatch` is a Manifest V3 content script (`world: MAIN`, all frames). It only runs on `challenges.cloudflare.com` and restores a screen offset on `MouseEvent` / `PointerEvent`. Clicks into the CF iframe must go to **Chrome’s CDP port**, not a proxy shim.
+A new agent should follow **Install** then **Use**. Nothing else is required.
 
 ## Install
+
+Needs: Python 3.10+, Google Chrome or Chromium.
 
 ```bash
 git clone https://github.com/Sophomoresty/turnstile-bypass.git
 cd turnstile-bypass
-python3 -m pip install -r requirements.txt
+python3 scripts/install.py
 ```
 
-You need Google Chrome or Chromium.
+`install.py` creates `.venv` in this repo, installs `requirements.txt` (DrissionPage), packs `assets/turnstilePatch.zip`, and runs `scripts/preflight.py`.
 
-| OS | Chrome is found from |
+You want:
+
+```json
+{ "ok": true, "methods": { "drissionpage": true } }
+```
+
+| OS | If Chrome is not found |
 |---|---|
-| macOS | `/Applications/Google Chrome.app`, `~/Applications/...` |
-| Windows | `%PROGRAMFILES%`, `%LOCALAPPDATA%` |
-| Linux | `google-chrome-stable` / `chromium` on `PATH` |
-| WSL | also `/mnt/c/Program Files/Google/Chrome/...` |
+| macOS | Install Google Chrome, or `export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"` |
+| Windows | `set CHROME_PATH=C:\Path\to\chrome.exe` |
+| Linux | `sudo apt-get install -y google-chrome-stable` or `chromium` |
+| Linux, no desktop | `sudo apt-get install -y xvfb` then prefix commands with `xvfb-run -a` |
 
-If detection fails: `export CHROME_PATH=/path/to/chrome`.
-
-Optional **fast lane**: `agent-browser-cli` on your `PATH`, plus Node.js (reuses a Chrome you already launched).
-
-Linux with no desktop:
+Manual install (same result):
 
 ```bash
-sudo apt-get install -y xvfb
-xvfb-run -a python3 scripts/solve.py --url "https://example.com/login"
-```
-
-Check the machine:
-
-```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt   # Windows: .venv\Scripts\python.exe
+python3 scripts/pack_extension.py
 python3 scripts/preflight.py
 ```
 
-You want `methods.agent_browser` or `methods.drissionpage` to be `true`.
-
-## Usage
-
-Auto-pick the fastest available lane:
+## Use
 
 ```bash
 python3 scripts/solve.py --url "https://example.com/page-with-turnstile"
 ```
 
+Stdout is one JSON object.
+
+- Success: `"ok": true` and `token` longer than 20 characters. Send it in the next request immediately (about 300s TTL).
+- Failure: `"ok": false` and `error`. Do not invent a token.
+
 Force a lane:
 
 ```bash
-python3 scripts/solve.py --lane ab --url "https://example.com/login"
 python3 scripts/solve.py --lane drission --url "https://example.com/login"
+python3 scripts/solve.py --lane ab --url "https://example.com/login"
 ```
 
-If Chrome is already on the page:
+Linux without GUI:
 
 ```bash
-python3 scripts/solve_agent_browser.py
+xvfb-run -a python3 scripts/solve.py --url "https://example.com/login"
 ```
 
-Stdout is one JSON object. On success:
+Default lane: **DrissionPage + packaged extension** after `install.py`. If `agent-browser-cli` and Node are already on `PATH`, `solve.py` prefers that faster lane (`TURNSTILE_PREFER_AB=0` to force Drission).
 
-```json
-{"ok": true, "token": "0.xxxx...", "tokenLen": 800, "elapsed_s": 9.5}
+`--lane ab` is optional and faster only if `agent-browser-cli` + Node are already installed **and** that Chrome already has this extension. Iframe clicks must use Chrome CDP (default port **19221**), never the shim **19222**.
+
+YesCaptcha (last resort): `YESCAPTCHA_CLIENT_KEY` and
+
+```bash
+python3 scripts/solve.py --lane yescaptcha --url "https://example.com" --sitekey "0x..."
 ```
 
-On failure, `ok` is `false` and `error` says why. Empty tokens are never reported as success.
+## Chrome extension
 
-### Lanes
+Source of truth: **`assets/turnstilePatch/`** (load unpacked).
 
-1. **agent-browser** — no extra window. Managed widgets often emit a token in about 1–2s; interactive widgets click the CF iframe (default budget 28s).
-2. **DrissionPage + patch** — starts Chrome. Do not call `turnstile.reset()` first (it cancels auto-pass).
-3. **Camoufox / Playwright Firefox** — only if the page already lives there, or `--lane camoufox`.
-4. **YesCaptcha** — last resort, needs `YESCAPTCHA_CLIENT_KEY`.
+Packed copy: **`assets/turnstilePatch.zip`** (same two files). Rebuild with `python3 scripts/pack_extension.py`.
 
-### agent-browser ports
+The extension is Manifest V3, `world: MAIN`, `all_frames`, matches `https://challenges.cloudflare.com/*` only. It patches `MouseEvent.screenX/Y` because Chrome CDP clicks set screen coords equal to client coords ([chromium 40280325](https://issues.chromium.org/issues/40280325)), which Turnstile treats as a bot.
 
-Managed agent-browser exposes a shim (default **19222**) and real Chrome CDP (**19221**). Iframe clicks must use the Chrome port:
+**Load unpacked (manual Chrome):** `chrome://extensions` → Developer mode → Load unpacked → select `assets/turnstilePatch/`.
 
-```
-TURNSTILE_AB_CHROME_PORT=19221
-TURNSTILE_AB_SHIM_PORT=19222
-```
+DrissionPage does this for you via `add_extension`. You do not need to click that UI for the default `solve.py` path.
 
-Never attach the iframe WebSocket to `ws://127.0.0.1:19222/devtools/page/<iframe>`.
+## What it is not
+
+| In scope | Out of scope |
+|---|---|
+| Turnstile widget (visible / managed / interactive) | IUAM waiting room |
+| Token from `turnstile.getResponse()` or `cf-turnstile-response` | Bot Fight, JS challenge, IP ban |
+| Headed Chrome (Xvfb counts) | Headless Chrome |
+| | hCaptcha, reCAPTCHA |
 
 ## Verified
 
-Recorded **2026-09-07** on macOS (Darwin), Chrome 152, agent-browser bridge healthy, Chrome CDP **19221**, `turnstilePatch` loaded (`patched: true`). No GUI (`chrome-show` off).
+**2026-09-07**, macOS, Chrome 152, agent-browser + this extension, Chrome CDP 19221, `patched: true`. No `chrome-show`.
 
 | Target | Sitekey | Result | Time |
 |---|---|---|---|
-| [demo.turnstile.workers.dev](https://demo.turnstile.workers.dev/) | Cloudflare always-pass `1x00000000000000000000AA` | `ok`, iframe click, token length 21 | 9.47s |
-| Local `examples/interactive-dummy.html` | Cloudflare interactive dummy `3x00000000000000000000FF` | widget found, iframe click, `patched: true`, token length 21 | 9.45s |
+| https://demo.turnstile.workers.dev/ | Cloudflare always-pass `1x00000000000000000000AA` | `ok`, iframe click, token length 21 | 9.47s |
+| `examples/interactive-dummy.html` | Interactive dummy `3x00000000000000000000FF` | widget found, iframe click, `patched: true`, token length 21 | 9.45s |
 
-Both pages use **Cloudflare dummy sitekeys**. Those keys always mint the official test token `XXXX.DUMMY.TOKEN.XXXX`. That is enough to prove: navigate → find widget → click the CF iframe with the screenXY patch → read a token that passes the length gate.
+Cloudflare **dummy sitekeys always mint** `XXXX.DUMMY.TOKEN.XXXX`. That is enough to prove navigate → find widget → click CF iframe with the patch → read a token that passes the length gate. A production sitekey returns a much longer token (often 700–800+). Dummy keys will not.
 
-A production sitekey yields a much longer token (often 700–800+ characters). Dummy keys will not. IUAM interstitials were not tested and are out of scope.
-
-Reproduce the interactive dummy:
+Reproduce:
 
 ```bash
 python3 -m http.server 8766 --directory examples
 python3 scripts/solve.py --url "http://127.0.0.1:8766/interactive-dummy.html"
 ```
 
+## Layout
+
+```
+AGENTS.md                 # short runbook for coding agents
+README.md                 # this file
+LICENSE
+requirements.txt          # DrissionPage
+assets/turnstilePatch/    # unpacked MV3 extension
+assets/turnstilePatch.zip # same, zipped
+examples/interactive-dummy.html
+scripts/install.py        # venv + deps + pack + preflight
+scripts/preflight.py
+scripts/solve.py          # entry
+scripts/solve_turnstile.py
+scripts/pack_extension.py
+scripts/solve_agent_browser.py
+scripts/camoufox_turnstile.py
+scripts/solve_yescaptcha.py
+scripts/proxy_auth_extension.py
+scripts/runtime.py
+```
+
 ## Limits
 
-- Headed Chrome only (Xvfb counts).
-- Datacenter IPs often get an empty token; retry once on a residential proxy, then stop.
-- Token TTL is about 300 seconds; do not cache across sessions.
-- This is not a general Cloudflare WAF bypass.
+- Headed Chrome only.
+- Datacenter IPs often return an empty token; one residential-proxy retry, then stop.
+- Do not cache tokens across sessions.
+- Not a general Cloudflare WAF bypass.
 
 ## License
 
-Add a license before you treat this as a public package. The repository is published as-is for the Turnstile widget path above.
+MIT. See `LICENSE`.

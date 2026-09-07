@@ -1,7 +1,7 @@
 # core rules
 
 1. Turnstile / CF widget only. Not hCaptcha, reCAPTCHA, IUAM, or JS challenge.
-2. Lane: `scripts/solve.py` auto-picks. Existing agent-browser → AB. Else DrissionPage. Camoufox only if asked or `--lane camoufox`.
+2. Lane: default is DrissionPage + packaged extension (`scripts/solve.py`). `--lane ab` only when agent-browser already has this extension. Camoufox / YesCaptcha only if asked.
 3. Run `scripts/preflight.py` first. `ok` if any lane is true.
 4. No headless. No `chrome-show` / `Page.bringToFront`.
 5. `ok:true` only when token length > 20.

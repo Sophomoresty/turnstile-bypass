@@ -34,20 +34,21 @@ HOST_JS = """(() => {
   let ts = { has: typeof turnstile !== 'undefined', resp: '' };
   try { ts.resp = (typeof turnstile !== 'undefined' && turnstile.getResponse) ? String(turnstile.getResponse() || '') : ''; }
   catch (e) { ts.err = String(e); }
-  const sitekey = box && box.getAttribute('data-sitekey');
-  if (!inp) {
+  const host = (inp && (inp.closest('.cf-turnstile') || inp.closest('div.w-full') || inp.parentElement))
+    || box;
+  const sitekey = (box && box.getAttribute('data-sitekey')) || (host && host.getAttribute && host.getAttribute('data-sitekey'));
+  if (!host) {
     return { found: false, href: location.href, sitekey, ts, vis: document.visibilityState };
   }
-  const host = inp.closest('.cf-turnstile') || inp.closest('div.w-full') || inp.parentElement;
-  const r = host ? host.getBoundingClientRect() : null;
+  const r = host.getBoundingClientRect();
   return {
-    found: true,
+    found: r.width >= 50 || !!(inp && inp.value),
     href: location.href,
-    x: r ? r.x : 0,
-    y: r ? r.y : 0,
-    w: r ? r.width : 0,
-    h: r ? r.height : 0,
-    len: (inp.value || '').length,
+    x: r.x,
+    y: r.y,
+    w: r.width,
+    h: r.height,
+    len: (inp && inp.value || '').length,
     sitekey,
     ts,
     vis: document.visibilityState,

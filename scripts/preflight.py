@@ -14,25 +14,13 @@ if str(HERE) not in sys.path:
 import runtime  # noqa: E402
 
 
-def has_module(py: Path | None, name: str) -> bool:
-    if py is None or not py.is_file():
-        return False
-    import subprocess
-
-    r = subprocess.run(
-        [str(py), "-c", f"import {name}"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    return r.returncode == 0
-
-
 def main() -> int:
+    runtime.ensure_patch()
     chrome = runtime.find_chrome()
     venv = runtime.venv_python()
-    venv_ok = has_module(venv, "DrissionPage")
-    sys_ok = has_module(Path(sys.executable), "DrissionPage")
+    solver_py = Path(runtime.solver_python())
+    venv_ok = runtime.has_drissionpage(venv) if venv else False
+    sys_ok = runtime.has_drissionpage(Path(sys.executable))
     yescaptcha = bool(os.environ.get("YESCAPTCHA_CLIENT_KEY"))
     ab_cli = runtime.agent_browser_cli()
     node = runtime.node_bin()
@@ -46,11 +34,13 @@ def main() -> int:
         "ok": bool(ab_ok or drission_ok or yescaptcha),
         "platform": sys.platform,
         "patch_dir": str(runtime.PATCH_DIR),
+        "patch_zip": str(runtime.PATCH_ZIP),
         "patch_ok": patch_ok,
         "manifest_world_main": manifest_main,
         "chrome_path": chrome,
         "chrome_ok": chrome is not None,
         "venv_python": str(venv) if venv else None,
+        "solver_python": str(solver_py),
         "drissionpage_venv": venv_ok,
         "drissionpage_sys": sys_ok,
         "yescaptcha_key": yescaptcha,
@@ -60,13 +50,14 @@ def main() -> int:
         "ab_chrome_port": runtime.DEFAULT_AB_CHROME_PORT,
         "ab_shim_port": runtime.DEFAULT_AB_SHIM_PORT,
         "methods": {
-            "agent_browser": ab_ok,
             "drissionpage": drission_ok,
+            "agent_browser": ab_ok,
             "yescaptcha": yescaptcha,
         },
         "preferred": (
-            "agent_browser" if ab_ok else "drissionpage" if drission_ok else "yescaptcha" if yescaptcha else None
+            "drissionpage" if drission_ok else "agent_browser" if ab_ok else "yescaptcha" if yescaptcha else None
         ),
+        "install": "python3 scripts/install.py",
         "blockers": [],
     }
     if not patch_ok:

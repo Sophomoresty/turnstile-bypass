@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -47,28 +49,43 @@ def read_token(page) -> str:
 
 
 def click_widget(page) -> None:
-    challenge_input = page.ele("@name=cf-turnstile-response", timeout=1)
-    wrapper = challenge_input.parent()
-    iframe = wrapper.shadow_root.ele("tag:iframe")
-    iframe.run_js(
-        """
-        if (!window.dtp) {
-            window.dtp = 1;
-            function r(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
-            Object.defineProperty(MouseEvent.prototype, 'screenX', {
-              get: function() { return (this.clientX||0)+r(40,180); },
-              configurable: true
-            });
-            Object.defineProperty(MouseEvent.prototype, 'screenY', {
-              get: function() { return (this.clientY||0)+r(60,220); },
-              configurable: true
-            });
-        }
-        """
-    )
-    body = iframe.ele("tag:body").shadow_root
-    btn = body.ele("tag:input")
-    btn.click()
+    try:
+        host = page.ele(".cf-turnstile", timeout=0.8) or page.ele("@data-sitekey", timeout=0.4)
+        if host:
+            host.click()
+    except Exception:
+        pass
+    try:
+        iframe = page.ele("tag:iframe@src:challenges.cloudflare.com", timeout=0.8)
+        if iframe:
+            iframe.click()
+            iframe.run_js(
+                """
+                if (!window.dtp) {
+                    window.dtp = 1;
+                    function r(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
+                    Object.defineProperty(MouseEvent.prototype, 'screenX', {
+                      get: function() { return (this.clientX||0)+r(40,180); },
+                      configurable: true
+                    });
+                    Object.defineProperty(MouseEvent.prototype, 'screenY', {
+                      get: function() { return (this.clientY||0)+r(60,220); },
+                      configurable: true
+                    });
+                }
+                """
+            )
+    except Exception:
+        pass
+    try:
+        challenge_input = page.ele("@name=cf-turnstile-response", timeout=0.5)
+        wrapper = challenge_input.parent()
+        iframe = wrapper.shadow_root.ele("tag:iframe")
+        body = iframe.ele("tag:body").shadow_root
+        btn = body.ele("tag:input")
+        btn.click()
+    except Exception:
+        pass
 
 
 def solve_turnstile(page, timeout_s: float = 20.0) -> str | None:
@@ -97,7 +114,7 @@ def main() -> int:
     ap.add_argument("--chrome-path", default=None)
     ap.add_argument("--patch-dir", default=str(DEFAULT_PATCH))
     ap.add_argument("--proxy", default=None, help="http://host:port (no auth)")
-    ap.add_argument("--timeout", type=int, default=25)
+    ap.add_argument("--timeout", type=float, default=25)
     args = ap.parse_args()
 
     try:
@@ -105,9 +122,10 @@ def main() -> int:
     except ImportError:
         return emit(
             False,
-            error="DrissionPage not installed; pip install -r requirements.txt",
+            error="DrissionPage not installed; python3 scripts/install.py",
         )
 
+    runtime.ensure_patch()
     patch = Path(args.patch_dir).resolve()
     if not (patch / "manifest.json").is_file():
         return emit(False, error=f"patch dir missing: {patch}")
@@ -116,13 +134,25 @@ def main() -> int:
     if not chrome:
         return emit(False, error="chrome path not found; set CHROME_PATH")
 
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    profile = tempfile.mkdtemp(prefix="turnstile-chrome-")
     co = ChromiumOptions()
-    co.auto_port()
-    co.set_timeouts(base=3)
-    co.set_browser_path(chrome)
+    co.set_paths(
+        browser_path=chrome,
+        local_port=port,
+        address=f"127.0.0.1:{port}",
+        user_data_path=profile,
+    )
     co.add_extension(str(patch))
     co.set_argument("--no-sandbox")
     co.set_argument("--disable-dev-shm-usage")
+    co.set_argument("--no-first-run")
+    co.set_argument("--no-default-browser-check")
     co.set_argument("--window-size=1920,1080")
     if args.proxy:
         co.set_proxy(args.proxy)
@@ -138,13 +168,16 @@ def main() -> int:
             return emit(False, error="no token after timeout", elapsed_s=round(time.time() - t0, 2))
         return emit(True, token=token, elapsed_s=round(time.time() - t0, 2), tokenLen=len(token))
     except Exception as exc:
-        return emit(False, error=f"{type(exc).__name__}: {exc}")
+        import traceback
+
+        return emit(False, error=f"{type(exc).__name__}: {exc}", traceback=traceback.format_exc()[-800:])
     finally:
         if browser is not None:
             try:
                 browser.quit()
             except Exception:
                 pass
+        shutil.rmtree(profile, ignore_errors=True)
 
 
 if __name__ == "__main__":
