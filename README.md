@@ -2,12 +2,14 @@
 
 Self-contained Cloudflare challenge helper for macOS, Windows, and Linux.
 
-It drives headed Chrome to pass:
+It drives headed Chrome to pass the two CF layers people usually call “the shield”:
 
-1. **Turnstile widget** on a site’s own page (checkbox / managed) → JSON `token`
-2. **Interstitial / “请稍候…” / Just a moment** (IUAM JS or managed challenge before the origin) → `cf_clearance` and the real page
+1. **Turnstile widget** on a site page (e.g. `aipaycards.com/login`) → JSON `token`
+2. **Interstitial waiting room** (`请稍候…` / Just a moment, e.g. **grok.com**) → `cf_clearance` and the real origin
 
-It does **not** pass IP bans (1020), rate limits (1015), Bot Fight when Chrome itself is rejected, hCaptcha, or reCAPTCHA.
+`curl https://grok.com/` is **403** + `cf-mitigated: challenge`. After `solve.py --url https://grok.com/ --fresh`, the same Chrome tab is the Grok app with a `cf_clearance` cookie.
+
+It does **not** pass IP bans (1020), rate limits (1015), or Bot Fight when this Chrome is already rejected.
 
 A new agent should follow **Install** then **Use**. Nothing else is required.
 
@@ -48,12 +50,14 @@ python3 scripts/preflight.py
 ## Use
 
 ```bash
-python3 scripts/solve.py --url "https://example.com/page-with-turnstile"
+python3 scripts/solve.py --url "https://aipaycards.com/login"
+python3 scripts/solve.py --url "https://grok.com/" --fresh
 ```
 
 Stdout is one JSON object.
 
-- Success: `"ok": true` and `token` longer than 20 characters. Send it in the next request immediately (about 300s TTL).
+- Widget success: `"ok": true` and `token` longer than 20 characters. Use it immediately (~300s TTL).
+- Waiting-room success (grok.com): `"ok": true` and `kind` is `cf_clearance` or `cf_passed`, with `clearanceLen` > 20. The tab is the real site.
 - Failure: `"ok": false` and `error`. Do not invent a token.
 
 Force a lane:
@@ -108,7 +112,7 @@ macOS, Chrome 152, agent-browser, CDP **19221**.
 | https://demo.turnstile.workers.dev/ | dummy Turnstile | tokenLen 21 | 3.46s |
 | `examples/interactive-dummy.html` | dummy interactive | tokenLen 21 | 7.46s |
 | https://aipaycards.com/login | production Turnstile | tokenLen **816**, 3/3 | 8–11s |
-| https://grok.com/ | interstitial (`cf-mitigated: challenge`, title 请稍候…) | `kind=cf_clearance`, clearanceLen **597**, origin title Grok | 8.7s (`--fresh`) |
+| https://grok.com/ | interstitial (`cf-mitigated: challenge`) | `kind=cf_clearance`, clearanceLen **533–597**, origin title Grok | ~9s (`--fresh`) |
 
 `curl` to grok.com without this Chrome is **403** + `cf-mitigated: challenge`. After solve, the same tab is the Grok app. Interstitial path focuses the tab (`Page.bringToFront`) and clicks the CF iframe; waiting-room JS often refuses to finish if `document.visibilityState` is `hidden`.
 
