@@ -54,7 +54,7 @@ def pick_lane(forced: str | None) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Solve Cloudflare Turnstile")
+    ap = argparse.ArgumentParser(description="Solve Cloudflare Turnstile widget or interstitial")
     ap.add_argument("--url", default=None)
     ap.add_argument("--lane", choices=("auto", "ab", "drission", "camoufox", "yescaptcha"), default="auto")
     ap.add_argument("--timeout", type=float, default=None)

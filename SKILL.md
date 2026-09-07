@@ -1,14 +1,16 @@
 ---
 name: turnstile-bypass
-description: "Use when Cloudflare Turnstile widget needs a token. Clone this repo, python3 scripts/install.py, then python3 scripts/solve.py --url <page>."
+description: "Use for Cloudflare Turnstile widgets and 请稍候 / Just a moment interstitials. install.py then solve.py --url <page>."
 ---
 
 # turnstile-bypass
 
-Read **`README.md`** and **`AGENTS.md`** before running anything. The repo is self-contained.
+Read **`README.md`** and **`AGENTS.md`**.
 
-Install: `python3 scripts/install.py`  
-Solve: `python3 scripts/solve.py --url <page>`  
-Success: JSON `ok` and token length > 20.
+```bash
+python3 scripts/install.py
+python3 scripts/solve.py --url "https://grok.com/" --fresh
+python3 scripts/solve.py --url "https://aipaycards.com/login"
+```
 
-Default lane loads `assets/turnstilePatch` into headed Chrome (DrissionPage). Not IUAM, not headless.
+Success: JSON `ok` with Turnstile `token` length > 20, or `kind` `cf_clearance` / `cf_passed` after the waiting room.

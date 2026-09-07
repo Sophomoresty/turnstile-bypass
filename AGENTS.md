@@ -9,13 +9,12 @@ Read `README.md` first. Do not invent extra tools.
 4. Confirm preflight JSON has `"ok": true` and `"methods.drissionpage": true`.
 5. Solve:
    `python3 scripts/solve.py --url "<PAGE_WITH_TURNSTILE>"`
-6. Success: stdout JSON `"ok": true` and `token` length > 20. Hand the token to the next request immediately (TTL ~300s).
-7. `python3 scripts/e2e.py` must print `"ok": true` for both cases before you trust a change.
+6. Success: `"ok": true` and either `token` length > 20 (widget) or `kind` is `cf_clearance` / `cf_passed` / `both` (waiting room).
+7. Waiting room (grok.com): `python3 scripts/solve.py --url "https://grok.com/" --fresh`
+8. `python3 scripts/e2e.py` should stay green.
 
-Default: DrissionPage after `scripts/install.py`. If `agent-browser-cli` is on PATH, `solve.py` prefers it (`TURNSTILE_PREFER_AB=0` forces Drission).
+Default: DrissionPage after `install.py`. If `agent-browser-cli` is on PATH, `solve.py` prefers it (`TURNSTILE_PREFER_AB=0` forces Drission).
 
-Linux without a desktop:
+Linux without a desktop: `xvfb-run -a python3 scripts/solve.py --url "..."`
 
-`xvfb-run -a python3 scripts/solve.py --url "..."`
-
-Out of scope: IUAM 5s page, JS challenge, Bot Fight, hCaptcha, reCAPTCHA, headless Chrome.
+Out of scope: Cloudflare 1020/1015, Bot Fight ban, hCaptcha, reCAPTCHA, headless Chrome.

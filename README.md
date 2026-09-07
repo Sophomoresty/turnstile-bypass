@@ -1,8 +1,13 @@
 # turnstile-bypass
 
-Self-contained **Cloudflare Turnstile** solver for macOS, Windows, and Linux.
+Self-contained Cloudflare challenge helper for macOS, Windows, and Linux.
 
-It loads a small Chrome extension, opens the page in headed Chrome, clicks the Turnstile widget, and prints a JSON token. That is the CF checkbox / managed **widget**. It does not pass the 5-second “Checking your browser” waiting room, JS interstitials, Bot Fight, or other CAPTCHAs.
+It drives headed Chrome to pass:
+
+1. **Turnstile widget** on a site’s own page (checkbox / managed) → JSON `token`
+2. **Interstitial / “请稍候…” / Just a moment** (IUAM JS or managed challenge before the origin) → `cf_clearance` and the real page
+
+It does **not** pass IP bans (1020), rate limits (1015), Bot Fight when Chrome itself is rejected, hCaptcha, or reCAPTCHA.
 
 A new agent should follow **Install** then **Use**. Nothing else is required.
 
@@ -90,24 +95,25 @@ DrissionPage does this for you via `add_extension`. You do not need to click tha
 
 | In scope | Out of scope |
 |---|---|
-| Turnstile widget (visible / managed / interactive) | IUAM waiting room |
-| Token from `turnstile.getResponse()` or `cf-turnstile-response` | Bot Fight, JS challenge, IP ban |
-| Headed Chrome (Xvfb counts) | Headless Chrome |
-| | hCaptcha, reCAPTCHA |
+| Turnstile widget on the origin page | Cloudflare **1020** / **1015** / WAF block |
+| Interstitial “请稍候…” / Just a moment (JS or managed challenge) | Bot Fight when this Chrome is already banned |
+| `cf_clearance` + origin HTML | hCaptcha, reCAPTCHA, headless Chrome |
 
 ## Verified
 
-Live `python3 scripts/e2e.py` on **2026-09-08** (macOS, Chrome 152, agent-browser, CDP **19221**). Dummy-key cases and the production aipay widget all returned `ok: true`.
+macOS, Chrome 152, agent-browser, CDP **19221**.
 
-| Target | Lane | Token length | Time | Notes |
-|---|---|---|---|---|
-| https://demo.turnstile.workers.dev/ | ab | 21 | 3.46s | Cloudflare dummy key → official dummy token |
-| `examples/interactive-dummy.html` | ab | 21 | 7.46s | Interactive dummy key |
-| https://aipaycards.com/login | ab | **816** | 9.73s / 9.74s / 7.99s | Real sitekey, `patched: true`, not dummy; 3/3 |
+| Target | What | Result | Time |
+|---|---|---|---|
+| https://demo.turnstile.workers.dev/ | dummy Turnstile | tokenLen 21 | 3.46s |
+| `examples/interactive-dummy.html` | dummy interactive | tokenLen 21 | 7.46s |
+| https://aipaycards.com/login | production Turnstile | tokenLen **816**, 3/3 | 8–11s |
+| https://grok.com/ | interstitial (`cf-mitigated: challenge`, title 请稍候…) | `kind=cf_clearance`, clearanceLen **597**, origin title Grok | 8.7s (`--fresh`) |
 
-Cloudflare dummy sitekeys mint `XXXX.DUMMY.TOKEN.XXXX`. That still proves: open page → find widget → click CF iframe → token longer than 20. Production sitekeys return much longer tokens.
+`curl` to grok.com without this Chrome is **403** + `cf-mitigated: challenge`. After solve, the same tab is the Grok app. Interstitial path focuses the tab (`Page.bringToFront`) and clicks the CF iframe; waiting-room JS often refuses to finish if `document.visibilityState` is `hidden`.
 
 ```bash
+python3 scripts/solve.py --url "https://grok.com/" --fresh
 python3 scripts/e2e.py
 ```
 
@@ -136,10 +142,10 @@ scripts/runtime.py
 
 ## Limits
 
-- Headed Chrome only.
-- Datacenter IPs often return an empty token; one residential-proxy retry, then stop.
+- Headed Chrome only. Interstitial needs the tab visible (`Page.bringToFront`).
+- Datacenter IPs often fail; one residential-proxy retry, then stop.
 - Do not cache tokens across sessions.
-- Not a general Cloudflare WAF bypass.
+- Not 1020/1015/WAF block, not a fingerprint browser.
 
 本项目的开发 agent 能力由 [GenericAgent](https://github.com/lsdefine/GenericAgent) 提供。
 

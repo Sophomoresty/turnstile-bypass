@@ -15,10 +15,13 @@ EXAMPLES = ROOT / "examples"
 SOLVE = ROOT / "scripts" / "solve.py"
 
 
-def solve(url: str, lane: str, timeout: float = 40.0) -> dict:
+def solve(url: str, lane: str, timeout: float = 40.0, extra: list[str] | None = None) -> dict:
     t0 = time.time()
+    cmd = [sys.executable, str(SOLVE), "--lane", lane, "--url", url, "--timeout", str(timeout)]
+    if extra:
+        cmd.extend(extra)
     r = subprocess.run(
-        [sys.executable, str(SOLVE), "--lane", lane, "--url", url, "--timeout", str(timeout)],
+        cmd,
         capture_output=True,
         text=True,
         timeout=timeout + 40,
@@ -47,21 +50,30 @@ def main() -> int:
     thread = Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
     cases = [
-        ("ab", "https://demo.turnstile.workers.dev/"),
-        ("ab", "http://127.0.0.1:8766/interactive-dummy.html"),
+        ("ab", "https://demo.turnstile.workers.dev/", []),
+        ("ab", "http://127.0.0.1:8766/interactive-dummy.html", []),
+        ("ab", "https://grok.com/", ["--fresh"]),
     ]
     out = []
     try:
-        for lane, url in cases:
-            box = solve(url, lane)
+        for lane, url, extra in cases:
+            box = solve(url, lane, timeout=60.0 if "grok.com" in url else 40.0, extra=extra)
             out.append(
                 {
-                    "ok": bool(box.get("ok") and int(box.get("tokenLen") or 0) > 20),
+                    "ok": bool(
+                        box.get("ok")
+                        and (
+                            int(box.get("tokenLen") or 0) > 20
+                            or str(box.get("kind") or "") in ("cf_passed", "cf_clearance", "both")
+                        )
+                    ),
                     "lane": lane,
                     "url": url,
+                    "kind": box.get("kind"),
                     "elapsed_s": box.get("elapsed_s"),
                     "tokenLen": box.get("tokenLen"),
-                    "tokenPrefix": box.get("tokenPrefix") or str(box.get("token") or "")[:24],
+                    "clearanceLen": box.get("clearanceLen"),
+                    "titleAfterFresh": (box.get("binding") or {}).get("titleAfterFresh"),
                     "error": box.get("error"),
                     "chromePort": box.get("chromePort") or box.get("cdpPort"),
                 }
