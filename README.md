@@ -97,12 +97,13 @@ DrissionPage does this for you via `add_extension`. You do not need to click tha
 
 ## Verified
 
-Live `python3 scripts/e2e.py` on **2026-09-08** (macOS, Chrome 152, agent-browser, CDP **19221**). Both cases `ok: true`.
+Live `python3 scripts/e2e.py` on **2026-09-08** (macOS, Chrome 152, agent-browser, CDP **19221**). Dummy-key cases and the production aipay widget all returned `ok: true`.
 
-| Target | Lane | Token length | Time |
-|---|---|---|---|
-| https://demo.turnstile.workers.dev/ | ab | 21 | 3.46s |
-| `examples/interactive-dummy.html` | ab | 21 | 7.46s |
+| Target | Lane | Token length | Time | Notes |
+|---|---|---|---|---|
+| https://demo.turnstile.workers.dev/ | ab | 21 | 3.46s | Cloudflare dummy key → official dummy token |
+| `examples/interactive-dummy.html` | ab | 21 | 7.46s | Interactive dummy key |
+| https://aipaycards.com/login | ab | **816** | 9.73s / 9.74s / 7.99s | Real sitekey, `patched: true`, not dummy; 3/3 |
 
 Cloudflare dummy sitekeys mint `XXXX.DUMMY.TOKEN.XXXX`. That still proves: open page → find widget → click CF iframe → token longer than 20. Production sitekeys return much longer tokens.
 
