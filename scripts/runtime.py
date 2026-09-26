@@ -95,22 +95,20 @@ def chrome_candidates() -> list[Path]:
             out.append(Path(local) / "Google" / "Chrome" / "Application" / "chrome.exe")
         out.append(Path("/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"))
         out.append(Path("/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe"))
-    if is_linux():
-        for name in (
-            "google-chrome-stable",
-            "google-chrome",
-            "chromium-browser",
-            "chromium",
-            "chrome",
-        ):
-            p = which(name)
-            if p:
-                out.append(Path(p))
-    else:
-        for name in ("google-chrome-stable", "google-chrome", "chromium", "chromium-browser", "chrome"):
-            p = which(name)
-            if p:
-                out.append(Path(p))
+
+    for name in (
+        "google-chrome-stable",
+        "google-chrome",
+        "chromium-browser",
+        "chromium",
+        "chrome",
+        "helium",
+        "brave-browser",
+    ):
+        p = which(name)
+        if p:
+            out.append(Path(p))
+
     # de-dupe while keeping order
     seen: set[str] = set()
     uniq: list[Path] = []
