@@ -48,6 +48,16 @@ def read_token(page) -> str:
     return str(token or "")
 
 
+def reveal_widget(page) -> None:
+    try:
+        elements = page.eles('css:[id*="turnstile"], [class*="turnstile"]', timeout=0.8)
+        for el in elements:
+            if el.tag in ('button', 'input', 'a'):
+                el.click()
+    except Exception:
+        pass
+
+
 def click_widget(page) -> None:
     try:
         host = page.ele(".cf-turnstile", timeout=0.8) or page.ele("@data-sitekey", timeout=0.4)
@@ -163,6 +173,7 @@ def main() -> int:
         browser = Chromium(co)
         page = browser.get_tabs()[-1]
         page.get(args.url, timeout=max(15.0, float(args.timeout)))
+        reveal_widget(page)
         token = read_token(page)
         extra: dict = {"lane": "drission", "cdpPort": port}
         if len(token) <= 20:
