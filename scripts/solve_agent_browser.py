@@ -57,6 +57,11 @@ HOST_JS = """(() => {
 })()"""
 
 NODE_RUNNER = r"""
+const WebSocket = globalThis.WebSocket || (require("undici").WebSocket);
+if (typeof WebSocket !== "function") {
+  console.log(JSON.stringify({ ok: false, error: "no WebSocket (need Node 22+ or undici)" }));
+  process.exit(1);
+}
 const ws = new WebSocket(process.argv[1]);
 const plan = JSON.parse(process.argv[2]);
 let id = 0;
