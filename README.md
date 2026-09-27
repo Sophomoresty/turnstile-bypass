@@ -95,6 +95,22 @@ The extension is Manifest V3, `world: MAIN`, `all_frames`, matches `https://chal
 
 DrissionPage does this for you via `add_extension`. You do not need to click that UI for the default `solve.py` path.
 
+## HTTP frontend
+
+Depends on `gunicorn` and `flask`, which can be installed via `pip`.
+
+### Use
+
+```bash
+exec gunicorn -b 127.0.0.1:8000 -w 1 --threads 1 --timeout 120 http_frontend:app
+```
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/solve \
+     -H 'Content-Type: application/json' \
+     -d '{"url":"https://demo.turnstile.workers.dev"}'
+```
+
 ## What it is not
 
 | In scope | Out of scope |
@@ -127,6 +143,7 @@ python3 scripts/e2e.py
 AGENTS.md                 # short runbook for coding agents
 README.md                 # this file
 LICENSE
+http_frontend.py          # HTTP frontend
 requirements.txt          # DrissionPage
 assets/turnstilePatch/    # unpacked MV3 extension
 assets/turnstilePatch.zip # same, zipped
