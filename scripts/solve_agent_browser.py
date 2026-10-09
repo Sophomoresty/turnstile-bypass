@@ -77,16 +77,29 @@ ws.addEventListener('message', ev => {
   if (msg.error) reject(new Error(JSON.stringify(msg.error)));
   else resolve(msg.result || {});
 });
+async function move(x, y) {
+  await call('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', x, y, button: 'none', buttons: 0, pointerType: 'mouse',
+  });
+}
 async function click(x, y) {
-  const seq = [
-    ['mouseMoved', 0, 'none', 0],
-    ['mousePressed', 1, 'left', 1],
-    ['mouseReleased', 0, 'left', 1],
-  ];
-  for (const [type, buttons, button, clickCount] of seq) {
-    await call('Input.dispatchMouseEvent', { type, x, y, button, buttons, clickCount, pointerType: 'mouse' });
-    await new Promise(r => setTimeout(r, 16));
+  x = Number(x);
+  y = Number(y);
+  const steps = 8;
+  const x0 = Math.max(0, x - 90);
+  const y0 = Math.max(0, y - 36);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    await move(x0 + (x - x0) * t, y0 + (y - y0) * t);
+    await new Promise(r => setTimeout(r, 28));
   }
+  await call('Input.dispatchMouseEvent', {
+    type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse',
+  });
+  await new Promise(r => setTimeout(r, 40));
+  await call('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse',
+  });
 }
 ws.addEventListener('open', async () => {
   const out = { ok: false };
